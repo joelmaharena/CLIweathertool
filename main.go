@@ -74,7 +74,7 @@ func getWeather(latitude float64, longitude float64) (WeatherResponse, error) {
 		return WeatherResponse{}, err
 	}
 
-	return response, err
+	return response, nil
 
 }
 
