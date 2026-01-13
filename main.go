@@ -63,7 +63,7 @@ func main() {
 	if len(georesponse.Result) == 0 {
 		log.Fatal("Sorry that place doesn't seem to exist!")
 	}
-	url := fmt.Sprintf("https://api.open-meteo.com/v1/forecast?latitude=%.1f&longitude=%.1f&current_weather=true", georesponse.Result[0].Latitude, georesponse.Result[0].Longitude)
+	url := fmt.Sprintf("https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true", georesponse.Result[0].Latitude, georesponse.Result[0].Longitude)
 
 	res, err := http.Get(url)
 
