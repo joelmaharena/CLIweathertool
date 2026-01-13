@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,65 +24,81 @@ type WeatherResponse struct {
 	} `json:"current_weather"`
 }
 
-func getCoordinates(city string) GeocodingResponse {
+func getCoordinates(city string) (GeocodingResponse, error) {
 	safeCity := url.QueryEscape(city)
 	apiUrl := fmt.Sprintf("https://geocoding-api.open-meteo.com/v1/search?name=%s&count=1", safeCity)
 	res, err := http.Get(apiUrl)
 
 	if err != nil {
-		log.Fatal("Failed response from the Geocoding server: ", err)
+		return GeocodingResponse{}, err
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 
 	if err != nil {
-		log.Fatal("Could not read the response from Geocoding: ", err)
+		return GeocodingResponse{}, err
 	}
 
 	var response GeocodingResponse
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		log.Fatal("Could not parse the json: ", err)
+		return GeocodingResponse{}, err
 	}
 
-	return response
+	if len(response.Result) == 0 {
+		return response, fmt.Errorf("City '%s' not found", city)
+	}
+
+	return response, nil
 
 }
-func main() {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Greetings from the Weather CLI Tool")
-	fmt.Println("Please enter the desirable location to check weather: ")
-	input := ""
-	if scanner.Scan() {
-		input = scanner.Text()
-	}
-	var georesponse GeocodingResponse
-	georesponse = getCoordinates(input)
-	if len(georesponse.Result) == 0 {
-		log.Fatal("Sorry that place doesn't seem to exist!")
-	}
-	url := fmt.Sprintf("https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true", georesponse.Result[0].Latitude, georesponse.Result[0].Longitude)
+func getWeather(latitude float64, longitude float64) (WeatherResponse, error) {
+	url := fmt.Sprintf("https://api.open-meteo.com/v1/forecast?latitude=%f&longitude=%f&current_weather=true", latitude, longitude)
 
 	res, err := http.Get(url)
 
 	if err != nil {
-		log.Fatal("Oh no! Fatal error:", err)
+		return WeatherResponse{}, err
 	}
 	defer res.Body.Close()
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal("Could not read response:", err)
+		return WeatherResponse{}, err
 	}
 
 	var response WeatherResponse
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		log.Fatal("Could not parse the json: ", err)
+		return WeatherResponse{}, err
 	}
 
-	fmt.Printf("The temperature in %s is: %.1f°C \n", input, response.CurrentWeather.Temperature)
-	fmt.Printf("The windspeed in %s is: %.1f km/h\n", input, response.CurrentWeather.Windspeed)
+	return response, err
 
+}
+
+func main() {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("Greetings from the Weather CLI Tool")
+	fmt.Println("Please enter the desirable location to check weather: ")
+	city := ""
+
+	if scanner.Scan() {
+		city = scanner.Text()
+	}
+
+	coords, err := getCoordinates(city)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	weather, err := getWeather(coords.Result[0].Latitude, coords.Result[0].Longitude)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	fmt.Printf("The temperature in %s is: %.1f°C \n", city, weather.CurrentWeather.Temperature)
+	fmt.Printf("The windspeed in %s is: %.1f km/h\n", city, weather.CurrentWeather.Windspeed)
 }
