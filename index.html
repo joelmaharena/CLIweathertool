@@ -11,24 +11,35 @@
             button { padding: 10px 20px; font-size: 16px; background: #007bff; color: white; border: none; cursor: pointer; }
             button:hover { background: #0056b3;}
             #result { margin-top: 20px; font-size: 20px; color: #555;}
+
+            #history { margin-top: 40px; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
+            .history-item { background: white; padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+            .timestamp { color: #999; font-size: 12px; }
         </style>
     </head>
     <body>
         <h1> Weather Check </h1>
         <input type="text" id="cityInput" placeholder="Enter city">
         <button onclick="getWeather()">Check</button>
-        <div id="result"></div>
+        <br><br>
+        <div id="result" style="display:none;"></div>
 
+        <div id="history">
+            <h3>📜 Recent Searches</h3>
+            <div id="historyList">Loading...</div>
+        </div>
         <script>
+            window.onload = loadHistory;
+
             async function getWeather() {
                 const city = document.getElementById('cityInput').value;
                 const resultDiv = document.getElementById('result');
 
+                resultDiv.style.display = "block";
                 resultDiv.innerHTML = "Loading..."
 
                 try {
                     const response = await fetch(`/weather?city=${city}`);
-
                     if (!response.ok) {
                         const errorText = await response.text();
                         throw new Error(errorText);
@@ -42,10 +53,31 @@
                         Wind: ${data.windspeed.toFixed(1)} km/h<br>
                         ${data.weatherDescription}`;
 
-
+                    loadHistory();
 
                 } catch (error) {
                     resultDiv.innerHTML = `<span style="color:red">Error: ${error.message}</span>`
+                }
+            }
+            async function loadHistory() {
+                try {
+                    const response = await fetch('/history');
+                    const data = await response.json();
+
+                    const listDiv = document.getElementById('historyList');
+                    listDiv.innerHTML = "";
+
+
+                    data.forEach(item => {
+                        const date = new Date(item.search_time).toLocaleString();
+
+                        listDiv.innerHTML += `<div class="history-item">
+                                                <span>📍 ${item.city} </span>
+                                                <span class="timestamp">${date} </span>
+                                                </div>`;
+                    })
+                } catch (error) {
+                    console.error("Failed to load history:", error);
                 }
             }
         </script>

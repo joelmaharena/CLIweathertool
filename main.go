@@ -1,13 +1,26 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
+var db *sql.DB
+
+type SearchEntry struct {
+	ID         int64  `json:"id"`
+	City       string `json:"city"`
+	Searchtime string `json:"search_time"`
+}
 type GeocodingResponse struct {
 	Result []struct {
 		Latitude  float64 `json:"latitude"`
@@ -21,6 +34,39 @@ type WeatherResponse struct {
 		Windspeed   float64 `json:"windspeed"`
 		Weathercode int16   `json:"weathercode"`
 	} `json:"current_weather"`
+}
+
+func initDB() {
+	var err error
+	if err = godotenv.Load(); err != nil {
+		log.Println("Error loading .env file")
+	}
+
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		dbHost, dbPort, dbUser, dbPass, dbName)
+	db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = db.Ping(); err != nil {
+		log.Fatal("Could not connect to Docker Postgres: ", err)
+	}
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS search_history (
+    id SERIAL PRIMARY KEY, 
+    city TEXT, 
+    search_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`)
+
+	if err != nil {
+		log.Fatal("Failed to create table:", err)
+	}
+	fmt.Println("Succesfully connected to the Database!")
+
 }
 
 func getCoordinates(city string) (GeocodingResponse, error) {
@@ -89,6 +135,12 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Printf("Saving the city %s to the database...\n", city)
+	_, dbErr := db.Exec("INSERT INTO search_history (city) VALUES ($1)", city)
+	if dbErr != nil {
+		fmt.Println("DB Error:", dbErr)
+	}
+
 	weather, err := getWeather(coords.Result[0].Latitude, coords.Result[0].Longitude)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -121,12 +173,37 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "./index.html")
 }
 
+func historyHandler(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.Query("SELECT id, city, search_time FROM search_history ORDER BY id DESC LIMIT 10")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var history []SearchEntry
+
+	for rows.Next() {
+		var entry SearchEntry
+		if err := rows.Scan(&entry.ID, &entry.City, &entry.Searchtime); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		history = append(history, entry)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(history)
+}
+
 func main() {
+	initDB()
+
 	http.HandleFunc("/weather", weatherHandler)
-
 	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/history", historyHandler)
 
-	fmt.Println("Server started! Visit at http://localhost:8080/weather?city=London")
+	fmt.Println("Server started! Visit at http://localhost:8080/")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Println("Error starting server: ", err)
