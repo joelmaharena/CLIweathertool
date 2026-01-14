@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 )
 
 type GeocodingResponse struct {
@@ -78,27 +76,40 @@ func getWeather(latitude float64, longitude float64) (WeatherResponse, error) {
 
 }
 
-func main() {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Greetings from the Weather CLI Tool")
-	fmt.Println("Please enter the desirable location to check weather: ")
-	city := ""
-
-	if scanner.Scan() {
-		city = scanner.Text()
+func weatherHandler(w http.ResponseWriter, r *http.Request) {
+	city := r.URL.Query().Get("city")
+	if city == "" {
+		http.Error(w, "Please provide a city parameter such as ?city=London", http.StatusBadRequest)
+		return
 	}
-
 	coords, err := getCoordinates(city)
 	if err != nil {
-		fmt.Println("Error:", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	weather, err := getWeather(coords.Result[0].Latitude, coords.Result[0].Longitude)
 	if err != nil {
-		fmt.Println("Error:", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	fmt.Printf("The temperature in %s is: %.1f°C \n", city, weather.CurrentWeather.Temperature)
-	fmt.Printf("The windspeed in %s is: %.1f km/h\n", city, weather.CurrentWeather.Windspeed)
+
+	response := map[string]any{
+		"city":        city,
+		"temperature": weather.CurrentWeather.Temperature,
+		"windspeed":   weather.CurrentWeather.Windspeed,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func main() {
+	http.HandleFunc("/weather", weatherHandler)
+
+	fmt.Println("Server started! Visit at http://localhost:8080/weather?city=London")
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		fmt.Println("Error starting server: ", err)
+	}
 }
