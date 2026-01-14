@@ -104,8 +104,14 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "./index.html")
+}
+
 func main() {
 	http.HandleFunc("/weather", weatherHandler)
+
+	http.HandleFunc("/", homeHandler)
 
 	fmt.Println("Server started! Visit at http://localhost:8080/weather?city=London")
 	err := http.ListenAndServe(":8080", nil)

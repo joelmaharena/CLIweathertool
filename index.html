@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang=""en>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title> Go Weather App</title>
+        <style>
+            body {font-family: sans-serif; text-align: center; padding: 50px; background: #f0f2f5;}
+            h1 {color: #333}
+            input {padding: 10 px; font-size: 16px; width: 200px;}
+            button { padding: 10 px 20px; font-size: 16px; background: #007bff; color: white; border: none; cursor: pointer; }
+            button:hover { background: #0056b3;}
+            #result { margin-top: 20px; font-size: 20px; color: #555;}
+        </style>
+    </head>
+    <body>
+        <h1> Weather Check </h1>
+        <input type="text" id="cityInput" placeholder="Enter city">
+        <button onclick="getWeather()">Check</button>
+        <div id="result"></div>
+
+        <script>
+            async function getWeather() {
+                const city = document.getElementById('cityInput').value;
+                const resultDiv = document.getElementById('result');
+
+                resultDiv.innerHTML = "Loading..."
+
+                try {
+                    const response = await fetch(`/weather?city=${city}`);
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(errorText);
+                    }
+
+                    const data = await response.json()
+
+                    resultDiv.innerHTML = `
+                        <strong>${data.city}</strong><br>
+                        Temperature: ${data.temperature.toFixed(1)}°C<br>
+                        Wind: ${data.windspeed.toFixed(1)} km/h`;
+
+
+                } catch (error) {
+                    resultDiv.innerHTML = `<span style="color:red">Error: ${error.message}</span>`
+                }
+            }
+        </script>
+    </body>
+</html>
