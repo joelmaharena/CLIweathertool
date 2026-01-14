@@ -19,6 +19,7 @@ type WeatherResponse struct {
 	CurrentWeather struct {
 		Temperature float64 `json:"temperature"`
 		Windspeed   float64 `json:"windspeed"`
+		Weathercode int16   `json:"weathercode"`
 	} `json:"current_weather"`
 }
 
@@ -94,10 +95,22 @@ func weatherHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var weatherDescription string
+	switch weather.CurrentWeather.Weathercode {
+	case 0:
+		weatherDescription = "Clear Sky☀️"
+	case 1, 2, 3:
+		weatherDescription = "Cloudy ☁️"
+	case 61, 63, 65:
+		weatherDescription = "Rain🌧️"
+	default:
+		weatherDescription = "Unknown"
+	}
 	response := map[string]any{
-		"city":        city,
-		"temperature": weather.CurrentWeather.Temperature,
-		"windspeed":   weather.CurrentWeather.Windspeed,
+		"city":               city,
+		"temperature":        weather.CurrentWeather.Temperature,
+		"windspeed":          weather.CurrentWeather.Windspeed,
+		"weatherDescription": weatherDescription,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

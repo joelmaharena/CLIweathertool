@@ -39,7 +39,9 @@
                     resultDiv.innerHTML = `
                         <strong>${data.city}</strong><br>
                         Temperature: ${data.temperature.toFixed(1)}°C<br>
-                        Wind: ${data.windspeed.toFixed(1)} km/h`;
+                        Wind: ${data.windspeed.toFixed(1)} km/h<br>
+                        ${data.weatherDescription}`;
+
 
 
                 } catch (error) {
